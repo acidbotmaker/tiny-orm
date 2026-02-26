@@ -6,12 +6,11 @@ ROOT_DIR: Path = Path(__file__).parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-# library import
+# ----- library import -----
 from typing import List, Optional
 from mysql.connector.connection import MySQLConnection
 
-# local import
-from classes.CrudOperations import StudentInfo
+# ----- local import -----
 from classes.Student import Student
 from utils import get_db_connection
 
@@ -28,26 +27,26 @@ def main() -> None:
     if not conn:
         return
 
-    # create table
+    # ----- create table -----
     try:
-        StudentInfo.create_table(conn)
+        Student.create_table(conn)
 
     except Exception as e:
         print(f"Error creating a table: {e}")
 
-    # insert data into table
+    # ----- insert data into table -----
     try:
-        StudentInfo.insert_table(conn, students)
+        Student.insert_table(conn, students)
 
         print("\n-> Initial Data:")
-        all_students: List[Student] = StudentInfo.read_table(conn)
+        all_students: List[Student] = Student.read_table(conn)
         for s in all_students:
             print(f"ID: {s.id}, Name: {s.name}| Dept: {s.dept} | Email: {s.email} ")
 
     except Exception as e:
         print(f"Error during inserting data: {e}")
 
-    # update table data
+    # ----- update table data -----
     try:
         target_update = next((s for s in all_students if s.name == "ABHISHEK"), None)
         if target_update:
@@ -58,24 +57,24 @@ def main() -> None:
                 email="yuvraj@example.com",
                 dept="EC",
             )
-            StudentInfo.update_table(conn, updated_info)
+            Student.update_table(conn, updated_info)
 
         print("\n-> Updated Data:")
-        all_students: List[Student] = StudentInfo.read_table(conn)
+        all_students: List[Student] = Student.read_table(conn)
         for s in all_students:
             print(f"ID: {s.id}, Name: {s.name}| Dept: {s.dept} | Email: {s.email} ")
 
     except Exception as e:
         print(f"Error updating table data: {e}")
 
-    # delete data from table
+    # ----- delete data from table -----
     try:
         target_delete = next((s for s in all_students if s.name == "SACHIN"), None)
         if target_delete:
-            StudentInfo.delete_table(conn, target_delete)
+            Student.delete_table(conn, target_delete)
 
         print("\n-> Final Data:")
-        all_students: List[Student] = StudentInfo.read_table(conn)
+        all_students: List[Student] = Student.read_table(conn)
         for s in all_students:
             print(f"ID: {s.id}, Name: {s.name}| Dept: {s.dept} | Email: {s.email} ")
 
