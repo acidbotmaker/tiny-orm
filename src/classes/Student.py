@@ -26,20 +26,24 @@ class Student(BaseModel):
                 """
                 )
                 print("\n--- Table created successfully. ---")
-            except mysql.connector.Error as e:
-                print(f"Error: {e}")
+            except mysql.connector.Error as error:
+                print(f"Error creating table: {error}")
 
     # ----- add multiple records -----
     @staticmethod
     def insert_table(conn: MySQLConnectionAbstract, students: list["Student"]) -> None:
         with conn.cursor() as cursor:
-            sql: str = "INSERT INTO students(name, email, dept) VALUES (%s, %s, %s)"
-            val: list[tuple[str, str, str]] = [
-                (s.name, s.email, s.dept) for s in students
-            ]
-            cursor.executemany(sql, val)
-            conn.commit()
-            print(f"\n--- {cursor.rowcount} data inserted into table. ---")
+            try:
+                sql: str = "INSERT INTO students(name, email, dept) VALUES (%s, %s, %s)"
+                val: list[tuple[str, str, str]] = [
+                    (s.name, s.email, s.dept) for s in students
+                ]
+                cursor.executemany(sql, val)
+                conn.commit()
+                print(f"\n--- {cursor.rowcount} data inserted into table. ---")
+
+            except mysql.connector.Error as error:
+                print(f"Error inserting data: {error}")
 
     # ----- fetch and print records -----
     @staticmethod
@@ -55,33 +59,108 @@ class Student(BaseModel):
                 ]
                 return students
 
-            except Exception as e:
-                print(f"Error reading table: {e}")
+            except mysql.connector.Error as error:
+                print(f"Error reading table: {error}")
                 return []
 
-    # ----- update the data -----
+    # ----- finding all records -----
     @staticmethod
-    def update_table(conn: MySQLConnectionAbstract, student: "Student") -> None:
+    def find_all(
+        conn: MySQLConnectionAbstract,
+        criteria: Optional[dict] = None,
+        order_by: Optional[str] = "name",
+        direction: str = "ASC",
+        limit: Optional[int] = None,
+    ) -> list["Student"]:
         with conn.cursor() as cursor:
-            sql: str = (
-                "UPDATE students SET name = %s, email = %s, dept = %s WHERE id = %s"
-            )
-            val: tuple[str, str, str, str, str] = (
-                student.name,
-                student.email,
-                student.dept,
-                student.id,
-            )
-            cursor.execute(sql, val)
-            conn.commit()
-            print(f"\n--- {cursor.rowcount} row's updated. ---")
+            try:
+                query = f"SELECT id, name, email, dept FROM students"
+                values = []
+
+                if criteria:
+                    conditions = [f"{key} = %s" for key in criteria.keys()]
+                    query += " WHERE " + " AND ".join(conditions)
+                    values = list(criteria.values())
+
+                query += f" ORDER BY {order_by} {direction} "
+
+                if limit is not None:
+                    query += f" LIMIT {limit}"
+
+                cursor.execute(query, values)
+                rows = cursor.fetchall()
+
+                return [
+                    Student(id=row[0], name=row[1], email=row[2], dept=row[3])
+                    for row in rows
+                ]
+
+            except mysql.connector.Error as error:
+                print(f"Error finding all data: {error}")
+                return []
+
+    # ----- finding one record -----
+    @staticmethod
+    def find_one(
+        conn: MySQLConnectionAbstract,
+        criteria: dict[str, any],
+        order_by: Optional[str] = None,
+        direction: str = "ASC",
+    ) -> Optional["Student"]:
+        with conn.cursor() as cursor:
+            try:
+                conditions = " AND ".join([f"{key} = %s" for key in criteria.keys()])
+                values = tuple(criteria.values())
+
+                order = f" ORDER BY {order_by} {direction} " if order_by else ""
+                sql = f"SELECT id, name, email, dept FROM students WHERE {conditions} {order} LIMIT 1"
+
+                cursor.execute(sql, values)
+                row = cursor.fetchone()
+
+                if row:
+                    return Student(id=row[0], name=row[1], email=row[2], dept=row[3])
+                return None
+
+            except mysql.connector.Error as error:
+                print(f"Error finding specific data: {error}")
+
+    # ----- update the data -----
+    def save(self, conn: MySQLConnectionAbstract) -> None:
+        with conn.cursor() as cursor:
+            try:
+                if self.id:
+                    sql: str = (
+                        "UPDATE students SET name = %s, email = %s, dept = %s WHERE id = %s"
+                    )
+                    cursor.execute(sql, (self.name, self.email, self.dept, self.id))
+                    action = "updated"
+                else:
+                    sql: str = (
+                        "INSERT INTO students(name, email, dept) VALUES (%s, %s, %s)"
+                    )
+                    cursor.execute(sql, (self.name, self.email, self.dept))
+                    self.id = cursor.lastrowid
+                    action = "saved"
+
+                conn.commit()
+                print(f"--- Student {action} successfully. ---")
+
+            except mysql.connector.Error as error:
+                print(f"Error saving data: {error}")
 
     # ----- delete the data -----
-    @staticmethod
-    def delete_table(conn: MySQLConnectionAbstract, student: "Student") -> None:
+    def delete(self, conn: MySQLConnectionAbstract) -> None:
+        if not self.id:
+            print("can't delete without student id")
+            return
+
         with conn.cursor() as cursor:
-            sql: str = "DELETE FROM students WHERE id = %s"
-            params = (student.id,)
-            cursor.execute(sql, params)
-            conn.commit()
-            print(f"\n--- {cursor.rowcount} data deleted. ---")
+            try:
+                sql: str = "DELETE FROM students WHERE id = %s"
+                cursor.execute(sql, (self.id,))
+                conn.commit()
+                print(f"\n--- {cursor.rowcount} data deleted. ---")
+
+            except mysql.connector.Error as error:
+                print(f"Error deleting data: {error}")
